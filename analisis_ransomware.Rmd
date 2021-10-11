@@ -1,0 +1,194 @@
+---
+title: "Ataques Ransomware"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = dirname(rstudioapi::getActiveDocumentContext()$path))
+
+```
+
+## 1. Objetivo del Proyecto
+
+
+El objetivo de esta actividad es realizar un estudio relacionado a los ciberataques de ransomware a empresas en diversos países del mundo entre los años 2014 al 2021, identificar si existe alguna relación entre estos, patrones de comportamiento en común, así como analizar el comportamientos de las empresas víctimas de este tipo de ataques, cuales fueron los ransomware más utilizados y los sectores de la industria más comprometidos por este tipo de ataques.  
+
+Para este trabajo se cuenta con un dataset en el que se tiene la información de las empresas víctimas de ataques de ransomware, su tamaño, revenue, país de origen, entro otros datos relevantes para este estudio.
+
+
+## 2. Descripcion del Data set 
+
+**Dataset:** Ransomware Attacks.  
+**Año**: 2014 - 2021.  
+**Descripción:** Dataset el cual contiene los datos de diferentes ataques de Ransomware a empresas en un periodo de 7 años.  
+**Repositorio del dataset:** https://www.kaggle.com/shivansh002/ransomware-attacks.  
+**Autor:** OnePunchMan.  
+
+## 3. Descripcion de las Variables
+  
+  
+**1. empresa** : Es el nombre comercial de la empresa.  
+**2. alias** : Es el sobrenombre o el identificador por el cual es más conocida la empresa.  
+**3. desc** : Es la industria nicho en la cual está ubicada la empresa.  
+**4. sector** : Es el sector en el cual se desarrolla la empresa.  
+**5. tamano** : Es el tamaño de la empresa donde 1 significa muy pequeño y 300 muy grande.  
+**6. ingresos** : Es la cantidad de ingresos percibidos al año de la empresa(Millones de Dolares).  
+**7. ransomware_cost** : Es la cantidad de dinero solicitada por el atacante por el rescate(Millones de Dolares).  
+**8. ransomware_flag_pago** : Es el estado final del ataque donde se sabe si se pagó, no pago o no hay información.  
+**9. ransomware_anio** : Es el año del ataque Ransomware.  
+**10. ransomware_mes** : Es el mes del ataque Ransomware.  
+**11. pais** : El país de la empresa.  
+**12. hist_int** : Es la historia resumida del ataque.  
+**13. ransomware** : Es el nombre del Ransomware utilizado por el atacante.  
+**14. inicio** : Es la fecha desde que se tiene registro de los ingresos de la compañía.  
+**15. url** : Es la página web de la noticia donde se puede encontrar más información del ataque.  
+
+
+## 4. Procesamiento de la informacion
+
+### 4.1 Carga de librerias
+
+```{r echo=TRUE,warning=FALSE}
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(readxl))
+suppressPackageStartupMessages(library(scales))
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(ggrepel))
+suppressPackageStartupMessages(library(magrittr))
+suppressPackageStartupMessages(library(kableExtra))
+suppressPackageStartupMessages(library(DataExplorer))
+
+```
+
+
+### 4.2 Carga de informacion
+
+```{r echo=TRUE}
+
+atack_rw <- read_excel('01.Data/RansomwareAttacksV2.xlsx',sheet = 'Ransomware Attacks')
+
+```
+
+```{r echo=TRUE}
+# Formateo a los nombres de las Variables
+names(atack_rw) <- c("empresa", "alias", "desc", "sector", "tamano", "ingresos", "ransomware_cost", "ransomware_flag_pago", "ransomware_anio", "ransomware_mes", "pais", "hist_int", "ransomware", "inicio", "url")
+
+```
+
+### 4.3 Estructura del Dataset 
+
+```{r echo = FALSE}
+glimpse(atack_rw)
+
+```
+
+### 4.4 Tratamiento de la Data
+
+```{r pressure, echo=TRUE}
+
+# Removiendo Duplicados
+atack_rw %<>% dplyr::distinct(empresa,.keep_all = T)
+
+# Removiendo espacios en blanco
+atack_rw %<>% mutate_if(is.character,str_trim)
+
+# Transformado a Minusculas
+atack_rw %<>% mutate_if(is.character,str_to_lower)
+
+# Recodificando la Variable ransomware_mes
+atack_rw %<>% mutate(ransomware_mes = recode(ransomware_mes,
+                                            'jan'='01','feb'='02',
+                                            'mar'='03','apr'='04',
+                                            'may'='05','jun'='06',
+                                            'jul'='07','aug'='08',
+                                            'sep'='09','oct'='10',
+                                            'nov'='11','dec'='12'
+                                             ))
+
+# Asignando categoria 'unknown' a los missing en la variable 'ransomware'
+atack_rw$ransomware <- ifelse(is.na(atack_rw$ransomware),'unknown',atack_rw$ransomware)
+atack_rw$ransomware <- ifelse(atack_rw$ransomware=='not revealed','unknown',atack_rw$ransomware)
+
+# Creando variable ransomware_fecha
+atack_rw$ransomware_fecha <-  as.Date(atack_rw %$% str_c(ransomware_anio,"-",ransomware_mes,"-","01")) 
+
+```
+
+### 4.4 Analisis de Missing en las Variables
+
+```{r,echo=FALSE}
+atack_rw %>% plot_missing()
+```
+
+**Insights:**
+
+- Tenemos completitud al 100% de las Variables pais,mes y año del ataque de ransomware, tamaño de la empresa, etc que nos permitiran sacar estadisticas confiables.
+
+- Hay un Buen Nivel de empresas con el Dato de Ingresos en total 328(93%) que podemos utilizar para categorizar a empresas con alto,medio y bajo Nivel de Ingresos.
+
+- Hay un bajo Nivel del Dato del costo del ransomware 246(70%) empresas, Sin embargo tenemos un 30% que podriamos utilizar para estimar el % del costo del ransomware en funcion del ingreso de la compañia.
+
+- Hay un bajo Nivel del Dato del inicio de la compañia 301(85%) empresas, Sin embargo tenemos un 15% que podriamos utilizar para estimar el tiempo promedio transcurrido desde que inicio operaciones la compañia y el ataque de ransomware.
+
+## 5. Análisis exploratorio de los Ataques de Ransomware
+
+
+
+```{r,echo=FALSE,warning=FALSE}
+
+picos <- atack_rw %>% count(ransomware_fecha) %>% 
+  filter(n>25) %>% 
+  mutate(periodo=format(ransomware_fecha,'%B-%Y'))
+
+atack_rw %>% count(ransomware_fecha) %>% 
+  ggplot(aes(x=ransomware_fecha,y=n))+
+  geom_line(size=1,color='steelblue')+
+  geom_label(data = picos,aes(x=ransomware_fecha,y=n,label=periodo),
+             nudge_y = 2)+
+  theme_bw()+
+  labs(title = 'Comportamiento de los Ataques de Ransomware',
+       subtitle = 'Periodo: May 2014 a Jul 2021',
+       y = 'Cantidad de Ataques',
+       x = 'Fecha del Ataque')+
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
+  theme(plot.title.position = 'plot',
+        plot.title = element_text(size=20),
+        plot.subtitle = element_text(size=15),
+        axis.text = element_text(size=11),
+        axis.title = element_text(size=13))
+
+
+  
+
+```
+
+- Entre los años 2014 a 2019 tenemos un outlier en la cantidad de ataques de ransomware y ocurrio en Mayo 2017.  
+
+- La cantidad de ataques va desde 1 hasta un maximo de 30 por Mes, los picos mas altos ocurrieron en Mayo 2017 y Abril 2021.  
+
+- A partir del 2019 vemos un tendencia creciente en la cantidad de ataques de ransomware llegando a su tope en Abril 2021.  
+
+- En los años 2014 a 2016 la cantidad maxima de ataques de ransomware por mes fue de 2.  
+
+
+### Top 5 Ransomware
+
+```{r,echo=FALSE}
+
+atack_rw %>% count(ransomware) %>% arrange(desc(n)) %>% 
+  mutate(pct=percent(n/sum(n))) %>% 
+  mutate(n=as.character(n)) %>% 
+  filter(ransomware!='unknown') %>% head(5) %>% 
+  rename(Ransomware=ransomware,
+         'Empresas_afectadas(n)'=n,
+         'Empresas_afectadas(%)'=pct) %>% 
+  kbl() %>% 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F, position = "center")
+
+
+```
+
+
+
