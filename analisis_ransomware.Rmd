@@ -44,14 +44,19 @@ Para este trabajo se cuenta con un dataset en el que se tiene la información de
 **14. inicio** : Es la fecha desde que se tiene registro de los ingresos de la compañía.  
 **15. url** : Es la página web de la noticia donde se puede encontrar más información del ataque.  
 
+## 4. Descripcion de los Ransomware
 
-## 4. Procesamiento de la informacion
+[Listado de ransomware con su respectiva descripcion.]()
 
-### 4.1 Carga de librerias
+## 5. Procesamiento de la informacion
+
+### 5.1 Carga de librerias
 
 ```{r echo=TRUE,warning=FALSE}
 suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(tidyr))
 suppressPackageStartupMessages(library(readxl))
+suppressPackageStartupMessages(library(forcats))
 suppressPackageStartupMessages(library(scales))
 suppressPackageStartupMessages(library(stringr))
 suppressPackageStartupMessages(library(ggplot2))
@@ -59,15 +64,16 @@ suppressPackageStartupMessages(library(ggrepel))
 suppressPackageStartupMessages(library(magrittr))
 suppressPackageStartupMessages(library(kableExtra))
 suppressPackageStartupMessages(library(DataExplorer))
+suppressPackageStartupMessages(library(formattable))
 
 ```
 
 
-### 4.2 Carga de informacion
+### 5.2 Carga de informacion
 
 ```{r echo=TRUE}
 
-atack_rw <- read_excel('01.Data/RansomwareAttacksV2.xlsx',sheet = 'Ransomware Attacks')
+atack_rw <- read_excel('01.Data/RansomwareAttacksV3.xlsx',sheet = 'Ransomware Attacks')
 
 ```
 
@@ -77,14 +83,14 @@ names(atack_rw) <- c("empresa", "alias", "desc", "sector", "tamano", "ingresos",
 
 ```
 
-### 4.3 Estructura del Dataset 
+### 5.3 Estructura del Dataset 
 
 ```{r echo = FALSE}
 glimpse(atack_rw)
 
 ```
 
-### 4.4 Tratamiento de la Data
+### 5.4 Tratamiento de la Data
 
 ```{r pressure, echo=TRUE}
 
@@ -108,15 +114,16 @@ atack_rw %<>% mutate(ransomware_mes = recode(ransomware_mes,
                                              ))
 
 # Asignando categoria 'unknown' a los missing en la variable 'ransomware'
-atack_rw$ransomware <- ifelse(is.na(atack_rw$ransomware),'unknown',atack_rw$ransomware)
-atack_rw$ransomware <- ifelse(atack_rw$ransomware=='not revealed','unknown',atack_rw$ransomware)
+# atack_rw$ransomware <- ifelse(is.na(atack_rw$ransomware),'unknown',atack_rw$ransomware)
+
+# atack_rw$ransomware <- ifelse(atack_rw$ransomware=='not revealed','unknown',atack_rw$ransomware)
 
 # Creando variable ransomware_fecha
 atack_rw$ransomware_fecha <-  as.Date(atack_rw %$% str_c(ransomware_anio,"-",ransomware_mes,"-","01")) 
 
 ```
 
-### 4.4 Analisis de Missing en las Variables
+### 5.5 Analisis de Missing en las Variables
 
 ```{r,echo=FALSE}
 atack_rw %>% plot_missing()
@@ -132,7 +139,7 @@ atack_rw %>% plot_missing()
 
 - Hay un bajo Nivel del Dato del inicio de la compañia 301(85%) empresas, Sin embargo tenemos un 15% que podriamos utilizar para estimar el tiempo promedio transcurrido desde que inicio operaciones la compañia y el ataque de ransomware.
 
-## 5. Análisis exploratorio de los Ataques de Ransomware
+## 6. Análisis exploratorio de los Ataques de Ransomware
 
 
 
@@ -164,23 +171,28 @@ atack_rw %>% count(ransomware_fecha) %>%
 
 ```
 
-- Entre los años 2014 a 2019 tenemos un outlier en la cantidad de ataques de ransomware y ocurrio en Mayo 2017.  
+- Entre los años 2014 a 2019 tenemos un outlier en la cantidad de ataques de ransomware y ocurrio en Mayo 2017.
+
+- El pico de Mayo 2017 corresponde a la aparicion de wannacry, ademas que ese año es conocido como el [año del Ransomware](https://dis-blog.thalesgroup.com/security/2018/01/18/2017-year-ransomware)
 
 - La cantidad de ataques va desde 1 hasta un maximo de 30 por Mes, los picos mas altos ocurrieron en Mayo 2017 y Abril 2021.  
 
 - A partir del 2019 vemos un tendencia creciente en la cantidad de ataques de ransomware llegando a su tope en Abril 2021.  
 
-- En los años 2014 a 2016 la cantidad maxima de ataques de ransomware por mes fue de 2.  
+- En los años 2014 a 2016 la cantidad maxima de ataques de ransomware por mes fue de 2.
+
+- Durante la pandemia este grafico evidencia el incremento de ataques de ransomware.  
+
+
 
 
 ### Top 5 Ransomware
 
 ```{r,echo=FALSE}
-
 atack_rw %>% count(ransomware) %>% arrange(desc(n)) %>% 
   mutate(pct=percent(n/sum(n))) %>% 
   mutate(n=as.character(n)) %>% 
-  filter(ransomware!='unknown') %>% head(5) %>% 
+  filter(ransomware!='not revealed') %>% head(5) %>% 
   rename(Ransomware=ransomware,
          'Empresas_afectadas(n)'=n,
          'Empresas_afectadas(%)'=pct) %>% 
@@ -189,6 +201,341 @@ atack_rw %>% count(ransomware) %>% arrange(desc(n)) %>%
 
 
 ```
+
+## 7. Preguntas 
+
+### 7.1 ¿Cuál es el sector de la industria más atacado por ransomware en los ultimos 5 años?
+### 7.2 ¿Cuales fueron las industrias que tuvieron un crecimiento significativo en ataques de ransomware ? {.tabset .tabset-fade}
+
+Analizando un comportamiento General y el Top 5 de Sectores.
+
+#### 7.1 General
+
+```{r,echo=FALSE}
+dt <- atack_rw %>% 
+  filter(ransomware_fecha >='2016-01-01',
+         ransomware_fecha <'2021-01-01') %>% 
+  count(sector) %>% 
+  arrange(desc(n)) %>% 
+  mutate(pct=percent(n/sum(n))) %>% 
+  mutate(n=as.character(n),
+         pct=as.character(pct)) %>% 
+  rename(Sector=sector,
+         'Empresas_afectadas(n)'=n,
+         'Empresas_afectadas(%)'=pct) %>% 
+  mutate(id=1:19) %>% 
+  select(id,everything())
+
+DT::datatable(dt)
+
+```
+
+
+#### 7.2 Comportamiento Top 5
+
+```{r,echo=FALSE}
+
+top5_sector <- atack_rw %>% 
+  filter(ransomware_fecha >='2015-01-01',
+         ransomware_fecha <'2021-01-01') %>% 
+  count(sector) %>% 
+  arrange(desc(n)) %>%
+  head(5) %>% pull(sector)
+
+
+atack_rw %>% 
+  filter(ransomware_fecha >='2016-01-01',
+         ransomware_fecha <'2021-01-01') %>% 
+  filter(sector %in% top5_sector) %>% 
+  count(ransomware_anio,sector) %>% 
+  mutate(ransomware_anio_date = as.Date(paste0(ransomware_anio,'-01-01'))) %>% 
+  ggplot(aes(x=ransomware_anio,y=n,color=sector))+
+  geom_line(size=1.5)+
+  theme_bw()+
+  labs(title = 'Comportamiento de Ataques de Ransomware por Sector',
+       subtitle = 'Periodo: 2016-2020',
+       y = 'Cantidad de Ataques',
+       x = 'Fecha del Ataque')+
+  theme(plot.title.position = 'plot',
+        plot.title = element_text(size=20),
+        plot.subtitle = element_text(size=15),
+        axis.text = element_text(size=11),
+        axis.title = element_text(size=13))
+
+
+
+
+
+```
+
+**Insights:**
+
+- El sector tecnologico tuvo el mayor crecimiento en los ataques en el ultimo año a pesar de que el sector gobierno fue el mas impactado.
+
+
+### 7.3 ¿Las empresas pequeñas, medianas y grandes pagan el rescate de un ransomware? {.tabset .tabset-fade}
+
+Descripcion de los tipos de Empresas:
+
+* Pequeña Empresa : Menor a 1000 Millones  
+  
+* Mediana Empresa : Entre 1000 y 10,000 Millones  
+  
+* Gran Empresa    : Mayor a 10,0000 Millones  
+  
+#### Porcentaje 
+
+```{r,echo=FALSE}
+
+atack_rw <- atack_rw %>% 
+  mutate(empresa_cat=cut(ingresos,
+                          breaks=c(-Inf,1000,10000,Inf),
+                          labels=c('Pequeña','Mediana','Grande'))) %>% 
+  mutate(empresa_cat=as.character(empresa_cat))
+
+atack_rw %>% 
+  filter(ransomware_flag_pago %in% c('refused','ransom paid'),
+         !is.na(ingresos)) %>%
+  count(empresa_cat,ransomware_flag_pago) %>% 
+  group_by(empresa_cat) %>% 
+  mutate(pct=percent(n/sum(n))) %>% 
+  select(-n) %>% 
+  pivot_wider(names_from = ransomware_flag_pago,values_from = pct) %>% 
+  rename('Tipo de Empresa'= empresa_cat,
+         'Pago Ransomware'='ransom paid',
+         'No Pago Ransomware'=refused) %>% 
+  formattable()
+  
+
+```
+
+**Insights:**
+
+- Las grandes empresas tienen mas probabilidad de pagar ante un ataque de ransomware.
+
+- Las medianas y pequeñas empresas tienen mas probabilidad de no pagar ante un ataque de ransomware.  
+
+
+#### Cantidad 
+
+```{r,echo=FALSE}
+
+atack_rw %>% 
+  filter(ransomware_flag_pago %in% c('refused','ransom paid'),
+         !is.na(ingresos)) %>%
+  count(empresa_cat,ransomware_flag_pago) %>% 
+  pivot_wider(names_from = ransomware_flag_pago,values_from = n) %>% 
+  rename('Tipo de Empresa'= empresa_cat,
+         'Pago Ransomware'='ransom paid',
+         'No Pago Ransomware'=refused) %>% 
+  formattable()
+  
+
+```
+
+
+### 7.4 ¿Cúal ha sido la tendencia en la recompensa de ransomware en estos años?  {.tabset .tabset-fade}
+
+#### Resultados
+
+```{r,echo=FALSE}
+
+atack_rw %>% 
+  filter(ransomware_fecha >='2016-01-01',
+         ransomware_fecha <'2021-01-01') %>% 
+  group_by(ransomware_anio) %>%
+  summarise(prom_ransom_cost=mean(ransomware_cost,na.rm=TRUE),
+            n=n()) %>% 
+  mutate(ransomware_anio_date = as.Date(paste0(ransomware_anio,'-01-01'))) %>% 
+  ggplot(aes(x=ransomware_anio,y=prom_ransom_cost,size=n,
+             label=paste0('n: ',n) ))+
+  geom_line(size=1.5,color='steelblue')+
+  geom_point(color='red')+
+  geom_label(nudge_y = 15,size=4)+
+  geom_label(label='n = N* Empresas',x=2019,y=235,color='#104E8B')+
+  theme_bw()+
+  labs(title = 'Comportamiento de la Recompensa del Ransomware',
+       subtitle = 'Periodo: 2016-2020',
+       y = 'Recompensa Promedio ',
+       x = 'Fecha del Ataque')+
+  theme(plot.title.position = 'plot',
+        plot.title = element_text(size=20),
+        plot.subtitle = element_text(size=15),
+        axis.text = element_text(size=11),
+        axis.title = element_text(size=13),
+        legend.position = 'none')
+
+```
+
+**Insights:**
+
+- La recompensa promedio en los 3 ultimos años tienen un comportamiento creciente.  
+
+- La recompensa promedio obtuvo un pico en el 2017 y esto fue debido a la aparicion wannacry .
+
+
+#### Datos
+
+```{r,echo=FALSE}
+
+atack_rw %>% 
+  filter(ransomware_fecha >='2016-01-01',
+         ransomware_fecha <'2021-01-01') %>% 
+  group_by(ransomware_anio) %>%
+  summarise(prom_ransom_cost=mean(ransomware_cost,na.rm=TRUE),
+            n=n()) %>% 
+  mutate(prom_ransom_cost= round(prom_ransom_cost,2)) %>% 
+  rename('Año'=ransomware_anio,
+         'Recompensa Prom.'=prom_ransom_cost,
+         'N* Empresas'=n,
+         ) %>% 
+  formattable()
+```
+
+
+
+### 7.5 ¿Cuál es el sector de industria que más ha pagado por rescate de ransomware?
+
+```{r, echo=FALSE}
+rescate <- atack_rw %>% 
+  filter(ransomware_flag_pago=='ransom paid') %>% 
+  mutate(sector=str_to_title(sector)) %>% 
+  group_by(sector) %>% 
+  summarise(cost_total=sum(ransomware_cost,na.rm = T)) %>% 
+  mutate(sector=fct_reorder(sector,cost_total))
+
+rescate %>% 
+  ggplot(aes(x = sector,y=cost_total))+
+  geom_bar(stat = 'identity',fill='orange',color='black')+
+  coord_flip()+
+  theme_bw()+
+  labs(title = 'Distribucion del la Recompensa Pagada por Sector',
+       y = 'Recompensa ($ Mill.) ',
+       x = 'Sector')+
+  theme(plot.title.position = 'plot',
+        plot.title = element_text(size=20),
+        plot.subtitle = element_text(size=15),
+        axis.text = element_text(size=11),
+        axis.title = element_text(size=13),
+        legend.position = 'none')
+
+```
+
+**Insights:**
+
+- Los 2 Sectores que mas pagaron fueron Finanzas, energia y marcan una gran diferencia con respecto al sector Tecnologico(Top 3).  
+
+
+### 7.6 ¿Las empresas con altos ingresos han sido más afectadas por ataques de ransomware?
+
+```{r,echo=FALSE}
+
+count_empresacat_ransomyear <- atack_rw %>% 
+  count(empresa_cat,ransomware_anio) %>% 
+  filter(!is.na(empresa_cat)) %>% 
+  group_by(ransomware_anio) %>% 
+  mutate(n=n/sum(n)) %>% 
+  ungroup()
+
+count_empresacat_ransomyear %>% 
+  ggplot(aes(x=ransomware_anio,y = n,fill=empresa_cat))+
+  # geom_bar(stat = 'identity',position = position_fill(),color='black')+
+  geom_bar(stat = 'identity',color='black')+
+  geom_text(aes(label=percent(n,digits = 0)), position = position_stack(vjust= 0.5),
+            colour = "black", size = 4)+
+  theme_bw()+
+  labs(title = 'Distribucion de Ataques por Año y Tipo de Empresa',
+       x = 'Año de Ataque ',
+       y = 'Nivel de Ataque (%)',
+       fill='Tipo de Empresa')+
+  theme(plot.title.position = 'plot',
+        plot.title = element_text(size=20),
+        plot.subtitle = element_text(size=15),
+        axis.text = element_text(size=11),
+        axis.title = element_text(size=13),
+        legend.position = 'top')
+
+
+```
+
+**Insights:**
+
+- No, las empresas pequeñas fueron las mas afectadas en el periodo de tiempo 2014-2021.  
+
+### 7.7 ¿En qué meses ocurre con mayor frecuencia ataques de ransomware?
+
+
+```{r, echo=FALSE}
+
+atack_meses <- atack_rw %>% 
+  filter(ransomware_fecha<'2021-01-01',
+         ransomware_fecha>='2017-01-01') %>% 
+  mutate(mes_ransomware=months(ransomware_fecha)) %>%
+  mutate(mes_ransomware=str_sub(mes_ransomware,1,3)) %>% 
+  mutate(ransomware_mes=ransomware_mes %>% as.numeric) %>% 
+  mutate(mes_ransomware=fct_reorder(mes_ransomware,ransomware_mes)) %>% 
+  count(mes_ransomware) %>% 
+  mutate(pct=percent(n/sum(n),digits = 0))
+
+atack_meses %>% 
+  ggplot(aes(x=mes_ransomware,y=n,group=1,label=pct))+
+  geom_line(size=1.5,color='steelblue')+
+  geom_point(color='red')+
+  geom_label(nudge_y = 2,size=4)+
+  # geom_label(label='n = N* Empresas',x=2019,y=235,color='#104E8B')+
+  theme_bw()+
+  labs(title = 'Comportamiento del Nivel de ataques por Mes',
+       subtitle = 'Periodo: 2017-2020',
+       y = 'Cantidad de ataques (n) ',
+       x = 'Mes del Ataque')+
+  theme(plot.title.position = 'plot',
+        plot.title = element_text(size=20),
+        plot.subtitle = element_text(size=15),
+        axis.text = element_text(size=11),
+        axis.title = element_text(size=13),
+        legend.position = 'none')
+
+
+```
+
+**Insights:**
+
+- Los Meses con mayor cantidad de ataques ocurre en Mayo y Noviembre.
+
+- Se observa que antes de los meses 6(Jun) y 12(Dic) el nivel de ataques sigue una tendencia creciente, llegando a su pico 1 mes antes.
+
+### 7.8 ¿De qué país son las empresas más atacadas con ransomware?
+
+```{r, echo=FALSE}
+
+atack_rw %>% 
+  count(pais) %>% 
+  arrange(desc(n)) %>% 
+  head
+
+```
+
+### 8. Conclusiones
+
+-  El pico de Mayo 2017 corresponde a la aparicion de wannacry, ademas que ese año es conocido como el año del Ransomware.
+
+-  El top 3 de sectores mas atacados fueron el gobierno,tecnologico y salud.
+
+-  El sector financiero es el que mas ha pagado en ataques de ransomware.
+
+-  El sector que obtuvo un incremento sustancial en ataques de ransomware fue el tecnologico de 2019-2020.
+
+-  Las empresas grandes son mas probables a efectuar el pago ante un ataque de ransomware. 
+
+-  USA es el mas pais mas atacado por ransomware seguido por Reino Unido,canada y australia.
+
+-  Wannacry fue el ransomware que mas afecto a las empresas a nivel mundial.
+
+
+
+
+
+
 
 
 
