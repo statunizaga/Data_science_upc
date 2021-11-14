@@ -56,6 +56,7 @@ Para este trabajo se cuenta con un dataset en el que se tiene la información de
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(tidyr))
 suppressPackageStartupMessages(library(readxl))
+suppressPackageStartupMessages(library(plotly))
 suppressPackageStartupMessages(library(forcats))
 suppressPackageStartupMessages(library(scales))
 suppressPackageStartupMessages(library(stringr))
@@ -508,14 +509,32 @@ atack_meses %>%
 
 ```{r, echo=FALSE}
 
-atack_rw %>% 
+top10_country <- atack_rw %>% 
   count(pais) %>% 
   arrange(desc(n)) %>% 
-  head
+  head(10)
+
+# code_country <- c('us','gb','ca','au','fr',
+                  # 'de','in','jp','br','ru')
+code_country <- c('usa','gbr','can','aus','fra',
+                  'deu','ind','jpn','bra','rus')
+  
+top10_country$code <- code_country
+
+top10_country %<>% rename(value=n)
+top10_country$code %<>% str_to_upper()
+top10_country$pais %<>% str_to_title()
+
+plot_ly(top10_country, type='choropleth', locations=top10_country$code,
+        z=top10_country$value, text=top10_country$pais, colors ="Blues") %>% 
+  colorbar(title = "Cantidad de Ataques") %>% 
+  layout(title='Top 10 Paises 2014 - 2021 - Nivel Mundial ')
 
 ```
 
 ### 8. Conclusiones
+
+-  Wannacry fue el ransomware que mas afecto a las empresas a nivel mundial.  
 
 -  El pico de Mayo 2017 corresponde a la aparicion de wannacry, ademas que ese año es conocido como el año del Ransomware.
 
@@ -528,8 +547,6 @@ atack_rw %>%
 -  Las empresas grandes son mas probables a efectuar el pago ante un ataque de ransomware. 
 
 -  USA es el mas pais mas atacado por ransomware seguido por Reino Unido,canada y australia.
-
--  Wannacry fue el ransomware que mas afecto a las empresas a nivel mundial.
 
 
 
